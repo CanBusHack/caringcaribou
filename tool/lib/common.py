@@ -69,6 +69,41 @@ def list_to_hex_str(data, delimiter=""):
     return data_string
 
 
+def list_to_ascii(data, delimiter=""):
+    """Returns a hex string representation of the int values
+    in 'data', separated with 'delimiter' between each byte
+
+    Example:
+    list_to_hex_str([10, 100, 200]) -> 0a.64.c8
+    list_to_hex_str([0x07, 0xff, 0x6c], "") -> 07ff6c
+    :param data: iterable of values
+    :param delimiter: separator between values in output
+    :type data: [int]
+    :type delimiter: str
+    :return: hex string representation of data
+    :rtype str
+    """
+    data_string_ascii = delimiter.join([chr(i) for i in data])
+    data_string = "-- {}".format(data_string_ascii)
+    return data_string
+
+
+def list_to_bytes(data):
+    """Returns a bytes string representation of the int values
+    in 'data'
+
+    Example:
+    list_to_bytes[10, 100, 200]) -> b'\x0A\x64E'
+    list_to_hex_str([0x07, 0xff, 0x6c], "") -> b'\x07\xffl'
+    :param data: iterable of values
+    :type data: [int]
+    :return: bytes string representation of data
+    :rtype str
+    """
+    data_string = "{}".format(bytes(data))
+    return data_string
+
+
 def hex_str_to_nibble_list(data):
     """
     Converts a hexadecimal str values into a list of int nibbles.

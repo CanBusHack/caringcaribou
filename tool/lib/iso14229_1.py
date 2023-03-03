@@ -276,12 +276,14 @@ class Iso14229_1(object):
         """
         return self.tp.send_response(data)
 
-    def receive_response(self, wait_window):
+    def receive_response(self, wait_window, raise_negative_responses=False):
         """
         Attempts to receive a response through the underlying TP layer
 
         :param wait_window: Minimum time (in seconds) to wait before timeout
+        :param raise_negative_responses: Raise ValueError when negative response is true (except NRC 0x78)
         :return: The received response if successful,
+                 Raise Value Error on negative response (except 0x78),
                  None otherwise
         """
         start_time = time.process_time()
@@ -293,10 +295,12 @@ class Iso14229_1(object):
             response = self.tp.indication(wait_window)
             NRC = NegativeResponseCodes
             NRC_RCRRP = NRC.REQUEST_CORRECTLY_RECEIVED_RESPONSE_PENDING
-            if response is not None and len(response) > 3:
+            if response is not None and len(response) > 2:
                 if (response[0] == Constants.NR_SI and
                    response[2] == NRC_RCRRP):
                     continue
+                elif raise_negative_responses and response[0] == Constants.NR_SI:
+                    raise ValueError(response[2])
             break
         return response
 
@@ -336,13 +340,14 @@ class Iso14229_1(object):
         return response
 
     def read_memory_by_address(self, address_and_length_format,
-                               memory_address, memory_size):
+                               memory_address, memory_size, raise_negative_responses=False):
         """
         Sends a "read memory by address" request for 'memory_address'
 
         :param address_and_length_format: Address and length format
         :param memory_address: Memory address
         :param memory_size: Memory size
+        :param raise_negative_responses: Raise ValueError when negative response is true (except NRC 0x78)
         :return: Response data if successful,
                  None otherwise
         """
@@ -364,7 +369,7 @@ class Iso14229_1(object):
             memory_size = (memory_size >> 8)
 
         self.tp.send_request(request)
-        response = self.receive_response(self.P3_CLIENT)
+        response = self.receive_response(self.P3_CLIENT, raise_negative_responses=raise_negative_responses)
 
         return response
 

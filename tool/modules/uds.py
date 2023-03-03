@@ -1,6 +1,6 @@
 from __future__ import print_function
 from lib.can_actions import auto_blacklist
-from lib.common import list_to_hex_str, parse_int_dec_or_hex
+from lib.common import list_to_hex_str, parse_int_dec_or_hex, list_to_ascii, list_to_bytes
 from lib.constants import ARBITRATION_ID_MAX, ARBITRATION_ID_MAX_EXTENDED
 from lib.constants import ARBITRATION_ID_MIN
 from lib.iso15765_2 import IsoTp
@@ -801,14 +801,17 @@ def __dump_mem_wrapper(args):
     address_byte_size = args.address_byte_size
     memory_length_byte_size = args.memory_length_byte_size
     session_type = args.sess_type
+    print_ascii = args.print_ascii
+    print_bytes = args.print_bytes
     print_results = True
     dump_memory(arb_id_request, arb_id_response, timeout, start_addr, mem_length, mem_size, address_byte_size,
-                memory_length_byte_size, session_type, print_results)
+                memory_length_byte_size, session_type, print_results, print_ascii, print_bytes)
 
 
 def dump_memory(arb_id_request, arb_id_response, timeout,
                 start_addr=MEM_START_ADDR, mem_length=MEM_LEN, mem_size=MEM_SIZE, address_byte_size=ADDR_BYTE_SIZE,
-                memory_length_byte_size=MEM_LEN_BYTE_SIZE, session_type=3, print_results=True):
+                memory_length_byte_size=MEM_LEN_BYTE_SIZE, session_type=3, print_results=True,
+                print_ascii=False, print_bytes=False):
     """
     Sends read data by identifier (DID) messages to 'arb_id_request'.
     Returns a list of positive responses received from 'arb_id_response' within
@@ -825,6 +828,8 @@ def dump_memory(arb_id_request, arb_id_response, timeout,
     :param memory_length_byte_size: number of bytes of the memory length parameter
     :param session_type: session level
     :param print_results: whether progress should be printed to stdout
+    :param print_ascii: whether progress should be printed to stdout with ascii and hex
+    :param print_bytes: whether progress should be printed to stdout with bytes and hex
     :type address_byte_size: int
     :type memory_length_byte_size: int
     :type arb_id_request: int
@@ -835,6 +840,8 @@ def dump_memory(arb_id_request, arb_id_response, timeout,
     :type mem_size: int
     :type session_type: int
     :type print_results: bool
+    :type print_ascii: bool
+    :type print_bytes: bool
     :return: list of tuples containing memory address and response bytes on success,
              empty list if no responses
     :rtype [(int, [int])] or []
@@ -872,21 +879,37 @@ def dump_memory(arb_id_request, arb_id_response, timeout,
             if timeout is not None:
                 uds.P3_CLIENT = timeout
 
-            if print_results:
+            if (print_results or print_ascii) and not print_bytes:
                 print('Dumping Memory in range 0x{:x}-0x{:x}\n'.format(
                     start_addr, start_addr + mem_length))
                 print('Identified Addresses:')
                 print('Address    Value (hex)')
-            for identifier in range(start_addr, start_addr + mem_length, mem_size):
-                response = uds.read_memory_by_address(memory_address=identifier, memory_size=mem_size,
-                                                      address_and_length_format=(memory_length_byte_size << 4) + address_byte_size)
 
-                # Only keep positive responses
-                if response and Iso14229_1.is_positive_response(response):
-                    responses.append((identifier, response))
-                    if print_results:
-                        print('0x{:x}'.format(identifier), list_to_hex_str(response))
-            if print_results:
+            for identifier in range(start_addr, start_addr + mem_length, mem_size):
+                try:
+                    response = uds.read_memory_by_address(memory_address=identifier, memory_size=mem_size,
+                                                          address_and_length_format=(memory_length_byte_size << 4) +
+                                                                                    address_byte_size,
+                                                          raise_negative_responses=print_bytes)
+
+                    # Only keep positive responses
+                    if response and Iso14229_1.is_positive_response(response):
+                        responses.append((identifier, response))
+                        if print_bytes:
+                            print(list_to_hex_str(response)[2:])
+                        elif print_ascii:
+                            print('0x{:0{}x}'.format(identifier, address_byte_size * 2), list_to_ascii(response))
+                        elif print_bytes:
+                            print('0x{:0{}x}'.format(identifier, address_byte_size * 2), list_to_hex_str(response), list_to_bytes(response))
+                        elif print_results:
+                            print('0x{:0{}x}'.format(identifier, address_byte_size * 2), list_to_hex_str(response))
+
+                except ValueError as nrc:
+                    if print_bytes:
+                        print("FF" * mem_size)
+                    pass
+
+            if print_results and not print_bytes:
                 print("\nDone!")
             return responses
 
@@ -1099,6 +1122,14 @@ def __parse_args(args):
                             type=parse_int_dec_or_hex,
                             default=SESSION_TYPE,
                             help="Session Type for activating service (default: 3)")
+    parser_mem.add_argument("--print_ascii",
+                            type=bool,
+                            default=False,
+                            help="Output to stdout with ASCII text decoding")
+    parser_mem.add_argument("--print_bytes",
+                            type=bool,
+                            default=False,
+                            help="Output to stdout with Bytes decoding")
     parser_mem.set_defaults(func=__dump_mem_wrapper)
 
     args = parser.parse_args(args)
