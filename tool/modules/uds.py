@@ -1109,11 +1109,11 @@ def __parse_args(args):
                                 type=file_name,
                                 help="Specifies a seeds file that contains"
                                      " expected seeds and key pairs."
-                                     "When a seed is seen a corisponding key "
+                                     " When a known seed is received a corresponding key "
                                      "will be sent and tester present will "
                                      "be started until CNTL-C is pressed."
                                      "Seed and Key pairs are hex strings with "
-                                     "one per line with a comma seperation. "
+                                     "one per line with a comma separation. "
                                      "(e.g., FBDE, A501"
                                      "02E5, 880B"
                                      "AF21, C930)"
