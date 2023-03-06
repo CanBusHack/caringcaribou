@@ -1114,7 +1114,7 @@ def __parse_args(args):
                                      "be started until CNTL-C is pressed."
                                      " Seed and Key pairs are hex strings with "
                                      "one per line with a comma separation. "
-                                     "(e.g., \nFBDE, A501 <NEW LINE>"
+                                     "(e.g., \nFBDE, A501 <NEW LINE> "
                                      "02E5, 880B <NEW LINE> "
                                      "AF21, C930)"
                                 )
