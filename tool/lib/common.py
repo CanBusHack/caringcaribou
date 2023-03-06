@@ -1,4 +1,18 @@
 
+def file_name(value):
+    """Parses Filename and places it into an open file stream
+
+    :param value: the filename
+    :type value: str
+    :rtype iostream
+    """
+
+    filename = fr"{value}"
+    fp = open(filename, 'r')
+
+    return fp
+
+
 def parse_int_dec_or_hex(value):
     """Parses an integer on base 10 (decimal) or 16 (hex with "0x" prefix)
 

@@ -127,6 +127,8 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         pass
+    except FileNotFoundError as e:
+        print("\nInput file not found. Please verify filename: {}".format(e))
     except can.CanError as e:
         print("\nCanError: {0}".format(e))
     except IOError as e:

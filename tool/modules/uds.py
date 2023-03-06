@@ -1,6 +1,6 @@
 from __future__ import print_function
 from lib.can_actions import auto_blacklist
-from lib.common import list_to_hex_str, parse_int_dec_or_hex, list_to_ascii, list_to_bytes
+from lib.common import list_to_hex_str, parse_int_dec_or_hex, list_to_ascii, list_to_bytes, file_name
 from lib.constants import ARBITRATION_ID_MAX, ARBITRATION_ID_MAX_EXTENDED
 from lib.constants import ARBITRATION_ID_MIN
 from lib.iso15765_2 import IsoTp
@@ -570,6 +570,24 @@ def print_negative_response(response):
           .format(nrc, nrc_description))
 
 
+def parse_seed_file(file_pointer, key_len):
+    try:
+        seed_key_dictionary = dict()
+        seed_key_pairs = file_pointer.read().split('\n')
+        if seed_key_pairs is not None:
+            for seed_key in seed_key_pairs:
+                seed_key_pair = seed_key.split(',')
+                key_string = seed_key_pair[1].zfill(key_len)
+
+                seed_key_dictionary[seed_key_pair[0]] = key_string
+        else:
+            raise ValueError("File Empty or not available.")
+
+        return seed_key_dictionary
+    except ValueError as e:
+        print("File Parse Error {}: {}".format(file_pointer.name, e))
+
+
 def __security_seed_wrapper(args):
     """Wrapper used to initiate security seed dump"""
     arb_id_request = args.src
@@ -579,8 +597,15 @@ def __security_seed_wrapper(args):
     level = args.sec_level
     num_seeds = args.num
     reset_delay = args.delay
+    seeds_file = args.seeds_file
+    key_len = args.key_len
+
+    seed_key_pairs_dict = None
+    if seeds_file:
+        seed_key_pairs_dict = parse_seed_file(seeds_file, key_len)
 
     seed_list = []
+
     try:
         print("Security seed dump started. Press Ctrl+C to stop.\n")
         while num_seeds > len(seed_list) or num_seeds == 0:
@@ -598,7 +623,25 @@ def __security_seed_wrapper(args):
             if response is None:
                 print("\nInvalid response")
             elif Iso14229_1.is_positive_response(response):
-                seed_list.append(list_to_hex_str(response[2:]))
+                seed = list_to_hex_str(response[2:])
+                if seed_key_pairs_dict is not None:
+                    if seed.lower() in seed_key_pairs_dict.keys():
+                        key = seed_key_pairs_dict[seed]
+                        key_list = [key[i:i + 2] for i in range(0, len(key), 2)]
+                        key_list_int = [int(i, 16) for i in key_list]
+                        response_sec_access = send_key(arb_id_request,
+                                                       arb_id_response,
+                                                       level + 1,
+                                                       key_list_int,
+                                                       0.1)
+
+                        if response_sec_access[0] == 0x67 and response_sec_access[1] == level + 1:
+                            print("Seed/Key pair collision: Sending key {} to seed {}".format(key_list_int, seed))
+                            while True:
+                                tester_present(arb_id_request, 1.5, None, False)
+                                time.sleep(1)
+
+                seed_list.append(seed)
                 print("Seed received: {}\t(Total captured: {})"
                       .format(list_to_hex_str(response[2:]),
                               len(seed_list)), end="\r")
@@ -759,8 +802,8 @@ def dump_dids(arb_id_request, arb_id_response, timeout,
 
     if max_did < min_did:
         raise ValueError("max_did must not be smaller than min_did -"
-                         " got min:0x{0:x}, max:0x{1:x}".format(
-            min_did, max_did))
+                         " got min:0x{0:x}, max:0x{1:x}"
+                         .format(min_did, max_did))
 
     responses = []
     with IsoTp(arb_id_request=arb_id_request,
@@ -900,7 +943,8 @@ def dump_memory(arb_id_request, arb_id_response, timeout,
                         elif print_ascii:
                             print('0x{:0{}x}'.format(identifier, address_byte_size * 2), list_to_ascii(response))
                         elif print_bytes:
-                            print('0x{:0{}x}'.format(identifier, address_byte_size * 2), list_to_hex_str(response), list_to_bytes(response))
+                            print('0x{:0{}x}'.format(identifier, address_byte_size * 2), list_to_hex_str(response),
+                                  list_to_bytes(response))
                         elif print_results:
                             print('0x{:0{}x}'.format(identifier, address_byte_size * 2), list_to_hex_str(response))
 
@@ -929,6 +973,7 @@ def __parse_args(args):
   cc.py uds ecu_reset 1 0x733 0x633
   cc.py uds testerpresent 0x733
   cc.py uds security_seed 0x3 0x1 0x733 0x633 -r 1 -d 0.5
+  cc.py uds security_seed 0x3 0x1 0x733 0x633 -r 1 -d 10 --seeds_file filename.txt
   cc.py uds dump_dids 0x733 0x633
   cc.py uds dump_dids 0x733 0x633 --min_did 0x6300 --max_did 0x6fff -t 0.1
   cc.py uds dump_mem 0x733 0x633 --start_addr 0 --mem_length 0x10000 --mem_size=4""")
@@ -1060,6 +1105,23 @@ def __parse_args(args):
                                      " seeds to capture before terminating. "
                                      "A '0' is interpreted as infinity. "
                                      "(default: 0)")
+    parser_secseed.add_argument("--seeds_file", metavar="SEEDS",
+                                type=file_name,
+                                help="Specifies a seeds file that contains"
+                                     " expected seeds and key pairs."
+                                     "When a seed is seen a corisponding key "
+                                     "will be sent and tester present will "
+                                     "be started until CNTL-C is pressed."
+                                     "Seed and Key pairs are hex strings with "
+                                     "one per line with a comma seperation. "
+                                     "(e.g., FBDE, A501"
+                                     "02E5, 880B"
+                                     "AF21, C930)"
+                                )
+    parser_secseed.add_argument("--key_len", metavar="NUM", default=4,
+                                type=parse_int_dec_or_hex,
+                                help="Length of keys in seeds_file."
+                                     "(default: 4)")
     parser_secseed.set_defaults(func=__security_seed_wrapper)
 
     # Parser for dump_did
