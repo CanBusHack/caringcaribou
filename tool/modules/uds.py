@@ -1105,7 +1105,7 @@ def __parse_args(args):
                                      " seeds to capture before terminating. "
                                      "A '0' is interpreted as infinity. "
                                      "(default: 0)")
-    parser_secseed.add_argument("--seeds_file", metavar="SEEDS",
+    parser_secseed.add_argument("--seeds_file", metavar="SEEDKEYPAIRS",
                                 type=file_name,
                                 help="Specifies a seeds file that contains"
                                      " expected seeds and key pairs."
@@ -1118,7 +1118,7 @@ def __parse_args(args):
                                      "02E5, 880B <NEW LINE> "
                                      "AF21, C930)"
                                 )
-    parser_secseed.add_argument("--key_len", metavar="NUM", default=4,
+    parser_secseed.add_argument("--key_len", metavar="LEN", default=4,
                                 type=parse_int_dec_or_hex,
                                 help="Length of keys in seeds_file."
                                      "(default: 4)")
