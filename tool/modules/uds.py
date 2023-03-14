@@ -576,10 +576,11 @@ def parse_seed_file(file_pointer, key_len):
         seed_key_pairs = file_pointer.read().split('\n')
         if seed_key_pairs is not None:
             for seed_key in seed_key_pairs:
-                seed_key_pair = seed_key.split(',')
-                key_string = seed_key_pair[1].zfill(key_len)
+                if seed_key != '':
+                    seed_key_pair = seed_key.split(',')
+                    key_string = seed_key_pair[1].zfill(key_len)
 
-                seed_key_dictionary[seed_key_pair[0]] = key_string
+                    seed_key_dictionary[seed_key_pair[0]] = key_string
         else:
             raise ValueError("File Empty or not available.")
 
